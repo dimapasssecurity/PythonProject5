@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Авторизация</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to right, #6a11cb, #2575fc);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .form-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            text-align: left;
+        }
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            transition: border-color 0.3s;
+        }
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: #6a11cb;
+            outline: none;
+        }
+        button {
+            background-color: #6a11cb;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2575fc;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+        }
+        .success {
+            color: green;
+            margin-top: 10px;
+        }
+        .register-link {
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="form-container">
+    <h2>Авторизация</h2>
+    <div id="message"></div>
+    <form id="loginForm">
+        <label for="username">Почта:</label>
+        <input type="text" id="username" name="username" required>
+
+        <label for="password">Пароль:</label>
+        <input type="password" id="password" name="password" required minlength="8">
+
+        <button type="submit">Войти</button>
+    </form>
+    <p class="register-link"><a href="/">Нет аккаунта? Зарегистрироваться</a></p>
+</div>
+
+<script>
+    const form = document.getElementById('loginForm');
+    const messageDiv = document.getElementById('message');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => data[key] = value);
+
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const json = await response.json();
+            showMessage(json.message, response.ok ? 'success' : 'error');
+
+            if (response.ok) {
+                // Здесь можно добавить логику для перенаправления пользователя после успешного входа
+                // Например, window.location.href = '/dashboard';
+            }
+        } catch (error) {
+            showMessage('Ошибка при авторизации.', 'error');
+        }
+    });
+
+    function showMessage(text, type) {
+        messageDiv.textContent = text;
+        messageDiv.classList.remove('error', 'success');
+        messageDiv.classList.add(type);
+    }
+</script>
+
+</body>
+</html>
+</title>
+</head>
+<body>
+
+</body>
+</html>

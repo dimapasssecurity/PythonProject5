@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to right, #6a11cb, #2575fc);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            width: 350px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input[type="email"]:focus,
+        input[type="password"]:focus {
+            border-color: #6a11cb; /* Цвет рамки при фокусе */
+            outline: none;
+        }
+
+        button[type="submit"] {
+            background-color: #6a11cb;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        button[type="submit"]:hover {
+            background-color: #2575fc; /* Цвет кнопки при наведении */
+        }
+
+        .auth-button {
+            background-color: transparent;
+            color: #6a11cb;
+            border: none;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 14px;
+            margin-top: 15px;
+        }
+
+        #message {
+            margin-top: 15px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        #message.error {
+            color: #f44336; /* Красный цвет для ошибок */
+        }
+
+        #message.success {
+            color: #4CAF50; /* Зеленый цвет для успеха */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Регистрация пользователя</h1>
+        <form id="registerForm" method="POST" action="/register">
+            <label for="username">Почта:</label>
+            <input type="email" id="username" name="username" required><br>
+
+            <label for="password">Пароль (минимум 8 символов):</label>
+            <input type="password" id="password" name="password" required minlength="8"><br>
+
+            <button type="submit">Зарегистрироваться</button>
+        </form>
+        <div id="message"></div>
+        <button class="auth-button" onclick="window.location.href='/login'">Уже есть аккаунт? Войти</button>
+    </div>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const messageDiv = document.getElementById('message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Клиентская валидация
+            if (!usernameInput.validity.valid) {
+                showMessage('Некорректный email.', 'error');
+                return;
+            }
+            if (passwordInput.value.length < 8) {
+                showMessage('Пароль должен содержать минимум 8 символов.', 'error');
+                return;
+            }
+
+            const formData = new FormData(form);
+            const data = {};
+            formData.forEach((value, key) => data[key] = value);
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const json = await response.json();
+                if (response.ok) {
+                    showMessage(json.message, 'success');
+                    // Здесь можно добавить логику для перенаправления пользователя после успешной регистрации
+                    // Например, window.location.href = '/login';
+                } else {
+                    showMessage(json.message, 'error');
+                }
+            } catch (error) {
+                showMessage('Ошибка при регистрации.', 'error');
+            }
+        });
+
+        function showMessage(text, type) {
+            messageDiv.textContent = text;
+            messageDiv.className = type; // Устанавливаем класс для стилизации сообщения
+        }
+    </script>
+</body>
+</html>
