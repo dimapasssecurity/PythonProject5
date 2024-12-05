@@ -1,6 +1,6 @@
 Flask
 peewee
-psycopg2-binary # Для PostgreSQL
-bcrypt
+psycopg2-binary
+bcrypt==3.2.3 # Или какая-то другая стабильная версия
 PyJWT
 secrets

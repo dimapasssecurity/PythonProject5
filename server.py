@@ -19,7 +19,7 @@ app.config['SECRET_KEY'] = secret_key
 app.config['JWT_EXPIRY_MINUTES'] = 60 # Добавьте эту строку! Время жизни токена в минутах
 # Конфигурация базы данных
 DATABASE_NAME = "postgres"  # Используйте имя вашей базы данных
-DATABASE_USER = "postgres"  # Используйте имя пользователя вашей базы данных
+DATABASE_USER = "postgres1"  # Используйте имя пользователя вашей базы данных
 DATABASE_PASSWORD = "admin"  # Используйте ваш пароль
 DATABASE_HOST = "127.0.0.1"
 DATABASE_PORT = 5432
@@ -254,4 +254,4 @@ def show_users():
 if __name__ == '__main__':
     connect_db()
     create_user_table()
-    app.run(debug=True)
+
