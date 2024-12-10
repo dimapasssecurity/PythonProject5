@@ -1,8 +1,4 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title><!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -119,8 +115,8 @@
             showMessage(json.message, response.ok ? 'success' : 'error');
 
             if (response.ok) {
-                // Здесь можно добавить логику для перенаправления пользователя после успешного входа
-                // Например, window.location.href = '/dashboard';
+                // Перенаправление на главную страницу после успешной авторизации
+                window.location.href = '/main_dashboard';
             }
         } catch (error) {
             showMessage('Ошибка при авторизации.', 'error');
@@ -133,12 +129,6 @@
         messageDiv.classList.add(type);
     }
 </script>
-
-</body>
-</html>
-</title>
-</head>
-<body>
 
 </body>
 </html>

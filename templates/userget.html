@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Информация о Пользователе</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+        .container {
+            width: 300px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .data-item {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Информация о Пользователе</h2>
+        <form id="getUserDataForm">
+            <label for="username">Введите email для поиска:</label>
+            <input type="text" id="username" name="username" required>
+            <button type="submit">Получить данные</button>
+        </form>
+        <div id="userData"></div>
+    </div>
+
+    <script>
+        const getUserDataForm = document.getElementById('getUserDataForm');
+        const userDataDiv = document.getElementById('userData');
+
+        getUserDataForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+
+            try {
+                const response = await fetch(/user_data/${username}); // Используйте правильный синтаксис для URL
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    userDataDiv.innerHTML = <p style="color:red;">Ошибка: ${errorData.message}</p>;
+                    return;
+                }
+                const userData = await response.json();
+                userDataDiv.innerHTML =
+                    <div class="data-item"><strong>ID:</strong> ${userData.user_id}</div>
+                    <div class="data-item"><strong>Имя пользователя:</strong> ${userData.username}</div>
+                    <div class="data-item"><strong>Полное имя:</strong> ${userData.fullname1}</div>
+                    <div class="data-item"><strong>Пароль:</strong> ${userData.password}</div> <!-- Открытый пароль -->
+                    <div class="data-item"><strong>Хеш пароля:</strong> ${userData.password_hash}</div> <!-- Хеш пароля -->
+                ;
+            } catch (error) {
+                console.error('Error fetching user data:', error);
+                userDataDiv.innerHTML = '<p style="color:red;">Ошибка при получении данных.</p>';
+            }
+        });
+    </script>
+</body>
+</html>

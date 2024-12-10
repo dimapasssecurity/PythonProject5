@@ -1,15 +1,16 @@
 from datetime import datetime, timedelta
 import os
 import jwt
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template , session
 import peewee
 from peewee import PostgresqlDatabase
 import bcrypt
 import secrets
-
+from flask_jwt_extended import create_access_token, JWTManager
 
 app = Flask(__name__)
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
     secret_key = secrets.token_hex(16) # Генерируем 128-битный ключ (16 байт * 2 hex символа/байт)
@@ -19,11 +20,13 @@ app.config['SECRET_KEY'] = secret_key
 app.config['JWT_EXPIRY_MINUTES'] = 60 # Добавьте эту строку! Время жизни токена в минутах
 # Конфигурация базы данных
 DATABASE_NAME = "postgres"  # Используйте имя вашей базы данных
-DATABASE_USER = "postgres1"  # Используйте имя пользователя вашей базы данных
+DATABASE_USER = "postgres"  # Используйте имя пользователя вашей базы данных
 DATABASE_PASSWORD = "admin"  # Используйте ваш пароль
 DATABASE_HOST = "127.0.0.1"
 DATABASE_PORT = 5432
 
+# Замените на надежный ключ!
+jwt = JWTManager(app)
 db = PostgresqlDatabase(
     DATABASE_NAME,
     user=DATABASE_USER,
@@ -33,13 +36,29 @@ db = PostgresqlDatabase(
 )
 
 
-class User(peewee.Model):
-    username = peewee.CharField(unique=True, max_length=80)
-    password_hash = peewee.BlobField()
-
+class BaseModel(peewee.Model):
     class Meta:
         database = db
+
+class User(BaseModel):
+    username = peewee.CharField(unique=True, max_length=80)
+    password_hash = peewee.BlobField()
+    password=peewee.CharField()
+    fullname1 = peewee.CharField(null=True, default='')
+    class Meta:
         db_table = 'users'
+
+
+class Event(BaseModel):
+    username = peewee.CharField(max_length=100, null=False)
+    name = peewee.CharField(max_length=100, null=False)
+    description = peewee.CharField(max_length=200, null=False)
+    start_date = peewee.CharField(max_length=50, null=False)
+    start_time = peewee.CharField(max_length=50, null=False)
+    end_time = peewee.CharField(max_length=50, null=False)
+
+    class Meta:
+        db_table = 'events'
 
 
 def connect_db():
@@ -59,8 +78,12 @@ def create_user_table():
     else:
         print("Таблица 'users' уже существует.")
 
-
-
+def create_event_table():
+    if not Event.table_exists():
+        db.create_tables([Event])
+        print("Таблица 'events' создана успешно!")
+    else:
+        print("Таблица 'events' уже существует.")
 
 
 def generate_jwt(user_id):
@@ -76,12 +99,13 @@ def hash_password(password):
     hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
     return hashed # Не нужно преобразовывать в bytes здесь
 
-def verify_password(plain_password, hashed_password):
-    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password)
+def verify_password(password, hashed_password):
+    return bcrypt.checkpw(password.encode('utf-8'), hashed_password)
 
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
+
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -92,7 +116,7 @@ def register():
         data = request.json
         username = data.get('username')
         password = data.get('password')
-
+        fullname1 = data.get('fullname1', '')  # Извлекаем fullname1, по умолчанию пустая строка
         if not username or not password:
             return jsonify({"message": "Имя пользователя и пароль обязательны!"}), 400
 
@@ -100,7 +124,8 @@ def register():
 
         with db.atomic():
             try:
-                User.create(username=username, password_hash=hashed_password)  # Храним bytes напрямую
+                User.create(username=username, password=password, password_hash=hashed_password,
+                            fullname1=fullname1)  # Добавляем fullname1
                 return jsonify({"message": "Пользователь успешно зарегистрирован!"}), 201
             except peewee.IntegrityError:
                 return jsonify({"message": "Пользователь с таким именем уже существует!"}), 409
@@ -128,119 +153,222 @@ def login():
             return jsonify({"message": "Имя пользователя и пароль обязательны!"}), 400
 
         user = User.get_or_none(User.username == username)
+
         if user is None:
             return jsonify({"message": "Неверное имя пользователя или пароль!"}), 401
 
-            # ПРАВИЛЬНО: Преобразуем в bytes только при извлечении из базы данных
         hashed_password_bytes = bytes(user.password_hash)
-
-        if not verify_password(password, hashed_password_bytes):
+        if not verify_password(password, hashed_password_bytes):  # Используем bcrypt для проверки
             return jsonify({"message": "Неверное имя пользователя или пароль!"}), 401
 
-        token = generate_jwt(user.id)
-        return jsonify({"message": "Успешный вход в систему!", "token": token}), 200
+        # Установите информацию о пользователе в сессии
+        session['user_id'] = user.id
+
+        # Сохраните информацию о сессии в БД
+
+
+        return jsonify({"message": "Успешный вход!"}), 200
 
     except Exception as e:
         print(f"Ошибка во время входа: {e}")
         return jsonify({"message": "Произошла непредвиденная ошибка"}), 500
 
-@app.route('/protected', methods=['GET'])
-def protected():
+
+
+@app.route('/user_data', methods=['GET'])
+def userget1():
+    return render_template('userget.html')
+
+@app.route('/user_data/<username>', methods=['GET'])
+def get_user_data(username):
     try:
-        auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return jsonify({"message": "Токен отсутствует"}), 401
 
-        token = auth_header.split(" ")[1] # Удаляем "Bearer "
-        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-        user_id = payload['user_id']
-        return jsonify({"message": f"Защищенный ресурс доступен. User ID: {user_id}"}), 200
-    except jwt.ExpiredSignatureError:
-        return jsonify({"message": "Токен истек"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"message": "Неверный токен"}), 401
-    except Exception as e:
-        print(f"Ошибка при проверке токена: {e}")
-        return jsonify({"message": "Произошла непредвиденная ошибка"}), 500
-
-# REST API для пользователей
-@app.route('/api/users', methods=['GET'])
-def get_users():
-    users_list = [{"id": user.id, "username": user.username} for user in User.select()]
-    return jsonify(users_list)
-
-
-@app.route('/api/users/<int:user_id>', methods=['GET'])
-def get_user(user_id):
-    user = User.get_or_none(User.id == user_id)
-    if user is None:
+        user = User.get(User.username == username)  # Получаем пользователя по имени
+        return jsonify({
+            'user_id': user.id,
+            'username': user.username,
+            'password': user.password,
+            'fullname1':user.fullname1
+        })
+    except User.DoesNotExist:
         return jsonify({'message': 'Пользователь не найден'}), 404
-    return jsonify({"id": user.id, "username": user.username})
+
+@app.route('/update_profile', methods=['GET'])
+def update_profile():
+    return render_template('updateuser.html')
 
 
-@app.route('/api/users', methods=['POST'])
-def create_user_api():
+@app.route('/update_profile/<username>', methods=['PUT'])
+def update_user_data(username):
     try:
-        if not request.is_json:
-            return jsonify({'message': 'Content-Type должен быть application/json'}), 415
-
+        # Обновляем данные пользователя в базе данных
         data = request.json
-        username = data.get('username')
-        password = data.get('password')
 
-        if not username or not password:
-            return jsonify({"message": "Имя пользователя и пароль обязательны!"}), 400
+        # Создаем словарь для обновляемых полей
+        updates = {}
 
-        hashed_password = hash_password(password)
+        if 'username' in data:
+            updates['username'] = data['username']
+        if 'fullname1' in data:
+            updates['fullname1'] = data['fullname1']
+        if 'password' in data:
+            updates['password'] = data['password']  # Хэшируем пароль перед обновлением
+            updates['password_hash'] = hash_password(data['password'])
 
-        with db.atomic():
-            try:
-                User.create(username=username, password_hash=hashed_password)
-                return jsonify({"message": "Пользователь успешно создан!"}), 201
-            except peewee.IntegrityError:
-                return jsonify({"message": "Пользователь с таким именем уже существует!"}), 409
+        # Обновляем пользователя в базе данных
+        query = User.update(**updates).where(User.username == username)
+        updated_rows = query.execute()  # Выполняем запрос обновления
 
-    except Exception as e:
-        print(f"Ошибка при создании пользователя: {e}")
-        return jsonify({"message": "Произошла непредвиденная ошибка"}), 500
-
-
-@app.route('/api/users/<int:user_id>', methods=['PUT'])
-def update_user_api(user_id):
-    try:
-        user = User.get_or_none(User.id == user_id)
-        if user is None:
+        if updated_rows == 0:
             return jsonify({'message': 'Пользователь не найден'}), 404
 
-        data = request.json
-        username = data.get('username')
-        password = data.get('password')
-
-        if username:
-            user.username = username
-        if password:
-            user.password_hash = hash_password(password)
-
-        user.save()
-        return jsonify({"message": "Пользователь успешно обновлен!"})
-
+        return jsonify({'message': 'Данные пользователя обновлены успешно'}), 200
     except Exception as e:
-        print(f"Ошибка при обновлении пользователя: {e}")
+        return jsonify({'message': str(e)}), 500  # Обработка других ошибок
+
+
+@app.route('/add_event', methods=['GET'])
+def add_event1():
+    return render_template('event.html')
+
+@app.route('/add_event', methods=['POST'])
+def add_event():
+    data = request.get_json()
+
+    # Проверка наличия необходимых полей
+    required_fields = ('name', 'description', 'start_date', 'start_time', 'end_time', 'username')
+    if not all(key in data for key in required_fields):
+        return jsonify({"message": "Недостаточно данных для создания мероприятия!"}), 400
+
+    # Проверка username (добавлено)
+    if not data['username']:
+        return jsonify({"message": "Имя пользователя не может быть пустым!"}), 400
+
+
+    # Преобразование дат и времени с обработкой ошибок
+    try:
+        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({"message": "Неверный формат даты! Ожидается YYYY-MM-DD."}), 400
+
+    try:
+        start_time = datetime.strptime(data['start_time'], '%H:%M').time()
+    except ValueError:
+        return jsonify({"message": "Неверный формат времени начала! Ожидается HH:MM."}), 400
+
+    try:
+        end_time = datetime.strptime(data['end_time'], '%H:%M').time()
+    except ValueError:
+        return jsonify({"message": "Неверный формат времени окончания! Ожидается HH:MM."}), 400
+
+
+    # Проверка на перекрытие (улучшенная проверка)
+    try:
+        overlapping_event = Event.select().where(
+            Event.username == data['username'],
+            Event.start_date == start_date,
+            Event.start_time <= end_time,
+            Event.end_time >= start_time
+        ).get() # .get() выбросит исключение, если совпадений нет
+        return jsonify({"message": "Вы уже запланировали мероприятие на это время!"}), 409
+    except Event.DoesNotExist:
+        pass # Нет перекрытий
+
+
+    # Создание нового мероприятия с обработкой исключений
+    try:
+        with db.atomic(): # Транзакция для атомарности операции
+            new_event = Event.create(
+                name=data['name'],
+                description=data['description'],
+                start_date=start_date,
+                start_time=start_time,
+                end_time=end_time,
+                username=data['username']
+            )
+        return jsonify({"message": "Мероприятие успешно добавлено!", "event_id": new_event.id}), 201
+    except IntegrityError as e: # Обработка ошибки целостности БД
+        return jsonify({"message": f"Ошибка добавления мероприятия: {e}"}), 500
+    except Exception as e:
+        return jsonify({"message": f"Непредвиденная ошибка: {e}"}), 500
+
+@app.route('/events1/', methods=['GET'])
+def get_events1():
+    return render_template('getevents.html')
+
+@app.route('/events1/<username>', methods=['GET'])
+def get_events(username):
+    try:
+        # Получаем все мероприятия для указанного пользователя
+        events = Event.select().where(Event.username == username)
+
+        # Преобразуем данные в формат JSON
+        event_list = []
+        for event in events:
+            event_data = {
+                'id': event.id,
+                'name': event.name,
+                'description': event.description,
+                'start_date': event.start_date, # Преобразуем дату в ISO формат
+                'start_time': event.start_time, # Преобразуем время в ISO формат
+                'end_time': event.end_time     # Преобразуем время в ISO формат
+            }
+            event_list.append(event_data)
+
+        return jsonify(events=event_list), 200
+
+    except Event.DoesNotExist:
+        return jsonify({"message": "Мероприятия для данного пользователя не найдены"}), 404
+    except Exception as e:
+        print(f"Ошибка при получении мероприятий: {e}")
         return jsonify({"message": "Произошла непредвиденная ошибка"}), 500
 
+@app.route('/deleteevent/', methods=['GET'])
+def deleteevent():
+    return render_template('deleteevents.html')
 
-@app.route('/api/users/<int:user_id>', methods=['DELETE'])
-def delete_user_api(user_id):
+
+@app.route('/deleteevent/<int:event_id>/<username>', methods=['POST'])
+def delete_event_post():
     try:
-        user = User.get_or_none(User.id == user_id)
-        if user is None:
-            return jsonify({'message': 'Пользователь не найден'}), 404
+        data = request.get_json()
+        if data is None:
+            return jsonify({"message": "Ошибка: Некорректный JSON в запросе"}), 400
 
-        user.delete_instance()
-        return jsonify({'message': 'Пользователь удален'})
+        event_id = data['id']
+        username = data['username']
+
+        event = Event.get((Event.id == event_id) & (Event.username == username))
+        event.delete_instance()
+        db.commit()
+        return jsonify({"message": "Мероприятие успешно удалено"}), 200
+
+    except Event.DoesNotExist:
+        return jsonify({"message": "Мероприятие с указанным ID и именем пользователя не найдено"}), 404
+    except KeyError as e:
+        return jsonify({"message": f"Ошибка: Отсутствует ключ в JSON: {e}"}), 400 # Более информативное сообщение
+    except Exception as e:
+        print(f"Ошибка при удалении мероприятия: {e}")
+        db.rollback()
+        return jsonify({"message": "Произошла непредвиденная ошибка при удалении мероприятия"}), 500
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    try:
+        # Убедитесь, что пользователь авторизован
+        if 'user_id' not in session:
+            return jsonify({"message": "Пользователь не авторизован!"}), 401
+
+        # Удалите информацию о пользователе из сессии
+        session.pop('user_id', None)
+
+        # Здесь можно добавить код для обновления информации о сессии в БД, если это необходимо
+
+        return jsonify({"message": "Вы успешно вышли!"}), 200
 
     except Exception as e:
-        print(f"Ошибка при удалении пользователя: {e}")
+        print(f"Ошибка во время выхода: {e}")
         return jsonify({"message": "Произошла непредвиденная ошибка"}), 500
 
 
@@ -252,6 +380,8 @@ def show_users():
 
 
 if __name__ == '__main__':
+
     connect_db()
     create_user_table()
-
+    create_event_table()
+    app.run(debug=True)

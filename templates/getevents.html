@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Календарь событий</title>
+<style>
+body { font-family: sans-serif; }
+.event { border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+
+<h1>Получить мероприятия по username</h1>
+<input type="text" id="usernameInput" placeholder="Введите username">
+<button onclick="getEvents()">Вывести мероприятия</button>
+
+<div id="eventsList"></div>
+
+<script>
+const eventsList = document.getElementById('eventsList');
+const usernameInput = document.getElementById('usernameInput');
+
+const getEvents = async () => {
+  const username = usernameInput.value;
+  if (!username) {
+    alert("Пожалуйста, введите username");
+    return;
+  }
+
+  try {
+    const response = await fetch(`/events1/${username}`);
+    if (!response.ok) {
+      const errorData = await response.json();
+      alert(`Ошибка: ${errorData.message}`);
+      return;
+    }
+    const data = await response.json();
+    eventsList.innerHTML = ''; // Очищаем список
+    data.events.forEach(event => {
+      const eventDiv = document.createElement('div');
+      eventDiv.className = 'event';
+      eventDiv.innerHTML = `
+        <h3>${event.name}</h3>
+        <p>${event.description}</p>
+        <p>Дата: ${event.start_date} ${event.start_time}</p>
+        <p>Окончание: ${event.end_time}</p>
+      `;
+      eventsList.appendChild(eventDiv);
+    });
+  } catch (error) {
+    alert(`Ошибка: ${error}`);
+  }
+};
+</script>
+
+</body>
+</html>

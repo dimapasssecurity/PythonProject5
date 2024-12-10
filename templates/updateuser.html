@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обновить данные пользователя</title>
+    <script>
+        async function updateUserData(event) {
+            event.preventDefault(); // Предотвращаем перезагрузку страницы
+
+            const username = document.getElementById('username').value;
+            const fullname1 = document.getElementById('fullname1').value;
+            const password = document.getElementById('password').value;
+
+            const response = await fetch(/user_data/${username}, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    fullname1: fullname1,
+                    password: password
+                })
+            });
+
+            const result = await response.json();
+            if (response.ok) {
+                alert(result.message);
+            } else {
+                alert(result.message);
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>Обновить данные пользователя</h1>
+    <form id="updateForm" onsubmit="updateUserData(event)">
+        <label for="username">Имя пользователя:</label><br>
+        <input type="text" id="username" name="username" required><br><br>
+
+        <label for="fullname1">Полное имя:</label><br>
+        <input type="text" id="fullname1" name="fullname1"><br><br>
+
+        <label for="password">Пароль:</label><br>
+        <input type="password" id="password" name="password"><br><br>
+
+        <input type="submit" value="Обновить данные">
+    </form>
+</body>
+</html>
