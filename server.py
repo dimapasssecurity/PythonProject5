@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import os
 import jwt
+import logging
 from flask import Flask, jsonify, request, render_template , session
 import peewee
 from peewee import PostgresqlDatabase
@@ -299,6 +300,7 @@ def get_events1():
 @app.route('/events1/<username>', methods=['GET'])
 def get_events(username):
     try:
+
         # Получаем все мероприятия для указанного пользователя
         events = Event.select().where(Event.username == username)
 
@@ -323,35 +325,36 @@ def get_events(username):
         print(f"Ошибка при получении мероприятий: {e}")
         return jsonify({"message": "Произошла непредвиденная ошибка"}), 500
 
-@app.route('/deleteevent/', methods=['GET'])
-def deleteevent():
-    return render_template('deleteevents.html')
 
+@app.route('/editevent/', methods=['GET'])
+def editevent():
+    return render_template('edit_event.html')
 
-@app.route('/deleteevent/<int:event_id>/<username>', methods=['POST'])
-def delete_event_post():
+@app.route('/editevent/<int:event_id>', methods=['PUT'])
+def edit_event(event_id):
     try:
-        data = request.get_json()
-        if data is None:
-            return jsonify({"message": "Ошибка: Некорректный JSON в запросе"}), 400
+        with db.atomic():
+            event = Event.get(Event.id == event_id) # Получаем мероприятие по ID
+            data = request.get_json()
 
-        event_id = data['id']
-        username = data['username']
+            # Обновляем поля мероприятия
+            event.username = data.get('username', event.username)
+            event.name = data.get('name', event.name)
+            event.description = data.get('description', event.description)
+            event.start_date = data.get('start_date', event.start_date)
+            event.start_time = data.get('start_time', event.start_time)
+            event.end_time = data.get('end_time', event.end_time)
+            event.save() # Сохраняем изменения
 
-        event = Event.get((Event.id == event_id) & (Event.username == username))
-        event.delete_instance()
-        db.commit()
-        return jsonify({"message": "Мероприятие успешно удалено"}), 200
+            logging.info(f"Мероприятие с ID {event_id} успешно обновлено")
+            return jsonify({"message": "Мероприятие успешно обновлено"}), 200
 
     except Event.DoesNotExist:
-        return jsonify({"message": "Мероприятие с указанным ID и именем пользователя не найдено"}), 404
-    except KeyError as e:
-        return jsonify({"message": f"Ошибка: Отсутствует ключ в JSON: {e}"}), 400 # Более информативное сообщение
+        logging.warning(f"Попытка обновить несуществующее мероприятие (ID: {event_id})")
+        return jsonify({"message": "Мероприятие не найдено"}), 404
     except Exception as e:
-        print(f"Ошибка при удалении мероприятия: {e}")
-        db.rollback()
-        return jsonify({"message": "Произошла непредвиденная ошибка при удалении мероприятия"}), 500
-
+        logging.exception(f"Непредвиденная ошибка при обновлении мероприятия (ID: {event_id}): {e}")
+        return jsonify({"message": "Произошла непредвиденная ошибка"}), 500
 
 @app.route('/logout', methods=['POST'])
 def logout():

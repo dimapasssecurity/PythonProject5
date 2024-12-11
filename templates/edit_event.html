@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Редактирование мероприятия</title>
+</head>
+<body>
+
+<h1>Редактирование мероприятия</h1>
+
+<form id="editForm">
+  <label for="eventId">ID мероприятия:</label><br>
+  <input type="number" id="eventId" name="eventId" required><br>
+  <label for="name">Название:</label><br>
+  <input type="text" id="name" name="name"><br>
+  <label for="description">Описание:</label><br>
+  <textarea id="description" name="description"></textarea><br>
+  <label for="startDate">Дата начала:</label><br>
+  <input type="date" id="startDate" name="startDate"><br>
+  <label for="startTime">Время начала:</label><br>
+  <input type="time" id="startTime" name="startTime"><br>
+  <label for="endTime">Время окончания:</label><br>
+  <input type="time" id="endTime" name="endTime"><br>
+  <button type="submit">Сохранить изменения</button>
+</form>
+
+<script>
+  const editForm = document.getElementById("editForm");
+  editForm.addEventListener('submit', function(event) {
+    event.preventDefault();
+    const eventId = document.getElementById("eventId").value;
+    if (!eventId) {
+      alert("Пожалуйста, введите ID мероприятия.");
+      return;
+    }
+
+    const eventData = {
+      name: document.getElementById('name').value,
+      description: document.getElementById('description').value,
+      start_date: document.getElementById('startDate').value,
+      start_time: document.getElementById('startTime').value,
+      end_time: document.getElementById('endTime').value,
+    };
+
+    fetch(`/editevent/${eventId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(eventData)
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      alert("Данные успешно обновлены!");
+    })
+    .catch(error => {
+      let errorMessage = "Ошибка при обновлении данных.";
+      if (error.message.includes("404")) {
+        errorMessage = "Мероприятие не найдено.";
+      } else if (error.message.includes("400")) {
+        errorMessage = "Неверный формат данных.";
+      }
+      alert(errorMessage);
+      console.error("Ошибка:", error);
+    });
+  });
+</script>
+
+</body>
+</html>
